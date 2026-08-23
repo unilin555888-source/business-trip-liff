@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>出差記錄</title>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{
+    --navy:#1F3A5F;
+    --navy-2:#2F5496;
+    --paper:#F5F6F8;
+    --card:#FFFFFF;
+    --ink:#1C1F26;
+    --muted:#6B7280;
+    --line:#E4E7EB;
+    --amber:#B7791F;
+    --amber-bg:#FEF3E2;
+    --ok:#1E7A34;
+    --ok-bg:#E7F6EA;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:0;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;
+    background:var(--paper); color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    background:var(--navy); color:#fff;
+    padding:18px 20px 16px;
+  }
+  header h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:.02em; }
+  header p{ margin:4px 0 0; font-size:12px; color:#C8D3E0; }
+  nav.tabs{
+    display:flex; background:var(--card); border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:5;
+  }
+  nav.tabs button{
+    flex:1; border:none; background:none; padding:13px 0; font-size:14px;
+    font-weight:600; color:var(--muted); border-bottom:2px solid transparent;
+  }
+  nav.tabs button.active{ color:var(--navy-2); border-bottom-color:var(--navy-2); }
+  main{ padding:16px; padding-bottom:60px; max-width:520px; margin:0 auto; }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:16px; margin-bottom:14px;
+  }
+  label{ display:block; font-size:14px; font-weight:600; color:var(--ink); margin-bottom:6px; }
+  .field{ margin-bottom:16px; }
+  .field:last-child{ margin-bottom:0; }
+  select, input[type="text"], textarea{
+    width:100%; padding:12px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:17px; background:#fff; color:var(--ink); font-family:inherit;
+  }
+  select{ font-weight:500; }
+  textarea{ resize:vertical; min-height:70px; }
+  .checkbox-row{ display:flex; align-items:center; gap:8px; }
+  .checkbox-row input{ width:18px; height:18px; }
+  .checkbox-row label{ margin:0; font-weight:500; }
+  .btn{
+    display:block; width:100%; padding:13px; border:none; border-radius:8px;
+    font-size:15px; font-weight:700; text-align:center;
+  }
+  .btn-primary{ background:var(--navy-2); color:#fff; }
+  .btn-secondary{ background:#fff; border:1px solid var(--line); color:var(--navy-2); }
+  .btn:disabled{ opacity:.5; }
+  .row-2{ display:flex; gap:10px; }
+  .row-2 > *{ flex:1; }
+  .loc-status{ font-size:12px; color:var(--muted); margin-top:8px; }
+  .loc-status.ok{ color:var(--ok); }
+  .photo-preview{
+    margin-top:10px; width:100%; max-height:180px; object-fit:cover;
+    border-radius:8px; display:none; border:1px solid var(--line);
+  }
+  .record{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:10px;
+  }
+  .record-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .record-loc{ font-weight:700; font-size:15px; }
+  .record-time{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .record-meta{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.6; }
+  .badge{
+    font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap;
+  }
+  .badge-pending{ background:var(--amber-bg); color:var(--amber); }
+  .badge-done{ background:var(--ok-bg); color:var(--ok); }
+  .record-actions{ margin-top:10px; }
+  .record-actions button{
+    font-size:13px; font-weight:700; padding:8px 14px; border-radius:7px;
+    border:1px solid var(--navy-2); background:#fff; color:var(--navy-2);
+  }
+  .empty{ text-align:center; color:var(--muted); font-size:14px; padding:40px 20px; }
+  #toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; max-width:85%; text-align:center;
+  }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .hint{ font-size:11px; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>出差記錄</h1>
+  <p id="userLine">載入使用者資訊中…</p>
+</header>
+
+<nav class="tabs">
+  <button id="tabNew" class="active">新增記錄</button>
+  <button id="tabList">待報帳清單</button>
+</nav>
+
+<main>
+  <!-- 新增記錄 -->
+  <section id="viewNew">
+    <div class="card">
+      <div class="field">
+        <label>事件類型</label>
+        <select id="fType">
+          <option value="出發">出發</option>
+          <option value="抵達">抵達</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>地點</label>
+        <select id="fLocationSelect">
+          <option value="私人_住家">私人_住家</option>
+          <option value="大古_總公司">大古_總公司</option>
+          <option value="大古_台北旗艦門市">大古_台北旗艦門市</option>
+          <option value="大古_新北鶯歌門市">大古_新北鶯歌門市</option>
+          <option value="大古_新竹竹北門市">大古_新竹竹北門市</option>
+          <option value="大古_台中豐樂門市">大古_台中豐樂門市</option>
+          <option value="大古_台南崇善門市">大古_台南崇善門市</option>
+          <option value="高鐵_台北">高鐵_台北</option>
+          <option value="高鐵_竹北">高鐵_竹北</option>
+          <option value="高鐵_台中">高鐵_台中</option>
+          <option value="高鐵_台南">高鐵_台南</option>
+          <option value="__custom__">其他_自行輸入</option>
+        </select>
+        <input type="text" id="fLocation" placeholder="輸入地點名稱" style="display:none; margin-top:8px;">
+      </div>
+      <div class="field">
+        <label>交通方式</label>
+        <select id="fTransport">
+          <option value="高鐵">高鐵</option>
+          <option value="台鐵">台鐵</option>
+          <option value="自駕">自駕</option>
+          <option value="客運">客運</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>目前位置</label>
+        <button type="button" class="btn btn-secondary" id="btnLocate">重新定位</button>
+        <div class="loc-status" id="locStatus">開啟頁面時會自動定位</div>
+      </div>
+      <div class="field">
+        <label>拍照</label>
+        <div class="row-2">
+          <button type="button" class="btn btn-secondary" id="btnCamera">啟動相機拍照</button>
+          <button type="button" class="btn btn-secondary" id="btnGallery">從相簿選擇</button>
+        </div>
+        <input type="file" accept="image/*" id="fPhoto" style="display:none;">
+        <div id="cameraView" style="display:none; margin-top:10px;">
+          <video id="cameraStream" autoplay playsinline style="width:100%; border-radius:8px; background:#000;"></video>
+          <div class="row-2" style="margin-top:8px;">
+            <button type="button" class="btn btn-primary" id="btnCapture">拍照</button>
+            <button type="button" class="btn btn-secondary" id="btnCancelCamera">取消</button>
+          </div>
+        </div>
+        <canvas id="captureCanvas" style="display:none;"></canvas>
+        <img id="photoPreview" class="photo-preview">
+      </div>
+      <div class="field">
+        <div class="checkbox-row">
+          <input type="checkbox" id="fOvertime">
+          <label for="fOvertime">是否申報加班</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>備註</label>
+        <textarea id="fNote" placeholder="選填"></textarea>
+      </div>
+      <div class="field">
+        <button type="button" class="btn btn-primary" id="btnSubmit">送出記錄</button>
+        <div class="hint">送出後可到「待報帳清單」查看，公司系統申請完成後回來勾選已報帳。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 待報帳清單 -->
+  <section id="viewList" hidden>
+    <div id="listContainer">
+      <div class="empty">載入中…</div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ============ 設定區 ============
+const LIFF_ID = '2011180006-0jQ8CmsU';
+// 部署完 Apps Script 後，把拿到的網址貼在這裡（記得留 /exec 結尾）
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYF0hKoj9OuJaWZxnpKPZ7Qi8Tqw17tHMO9XyeKb5JGQazR7YJpiB8Pw7h2SXYGSOA/exec';
+
+let currentUser = { userId: '', displayName: '訪客' };
+let currentLoc = { lat: '', lng: '' };
+let currentPhotoBase64 = '';
+
+// ============ 初始化 ============
+async function initLiff(){
+  try{
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    const profile = await liff.getProfile();
+    currentUser.userId = profile.userId;
+    currentUser.displayName = profile.displayName;
+    document.getElementById('userLine').textContent = profile.displayName + '，歡迎回來';
+  } catch(err){
+    // 在一般瀏覽器（非 LINE 內）測試畫面時，LIFF 可能無法初始化，這裡先讓畫面照常顯示
+    document.getElementById('userLine').textContent = '（預覽模式，尚未透過 LINE 登入）';
+    console.warn('LIFF init 失敗，可能是在一般瀏覽器預覽：', err);
+  }
+}
+initLiff();
+
+// ============ 分頁切換 ============
+const tabNew = document.getElementById('tabNew');
+const tabList = document.getElementById('tabList');
+const viewNew = document.getElementById('viewNew');
+const viewList = document.getElementById('viewList');
+
+tabNew.addEventListener('click', () => {
+  tabNew.classList.add('active'); tabList.classList.remove('active');
+  viewNew.hidden = false; viewList.hidden = true;
+});
+tabList.addEventListener('click', () => {
+  tabList.classList.add('active'); tabNew.classList.remove('active');
+  viewList.hidden = false; viewNew.hidden = true;
+  loadList();
+});
+
+// ============ 地點：預設下拉 / 自行輸入 ============
+const fLocationSelect = document.getElementById('fLocationSelect');
+const fLocationInput = document.getElementById('fLocation');
+fLocationSelect.addEventListener('change', () => {
+  if (fLocationSelect.value === '__custom__') {
+    fLocationInput.style.display = 'block';
+    fLocationInput.value = '';
+    fLocationInput.focus();
+  } else {
+    fLocationInput.style.display = 'none';
+  }
+});
+function getLocationValue(){
+  return fLocationSelect.value === '__custom__' ? fLocationInput.value.trim() : fLocationSelect.value;
+}
+
+// ============ 已知地點清單（用於自動偵測目前位置）============
+// 把 lat/lng 換成每個地點實際的座標即可啟用自動偵測；
+// 座標可以在 Google 地圖上對該地點按右鍵 →「這是哪裡？」→ 複製顯示出來的經緯度。
+// radius 是判定範圍（公尺），室內或訊號較差的地方可以抓大一點，例如 150~200。
+const KNOWN_LOCATIONS = [
+  { name: '私人_住家',        lat: 24.1819821, lng: 120.6181379, radius: 150 },
+  { name: '大古_總公司',       lat: 24.1746992, lng: 120.5908908, radius: 150 },
+  { name: '大古_台北旗艦門市', lat: 25.0367702, lng: 121.5439713, radius: 150 },
+  { name: '大古_新北鶯歌門市', lat: 24.9518319, lng: 121.3461187, radius: 150 },
+  { name: '大古_新竹竹北門市', lat: 24.8313481, lng: 121.0110055, radius: 150 },
+  { name: '大古_台中豐樂門市', lat: 24.1332416, lng: 120.640293,  radius: 150 },
+  { name: '大古_台南崇善門市', lat: 22.9816935, lng: 120.2190258, radius: 150 },
+  { name: '高鐵_台中',   lat: 24.11098,   lng: 120.6130957, radius: 200 },
+  { name: '高鐵_台北',   lat: 25.0472791, lng: 121.5150627, radius: 200 },
+  { name: '高鐵_竹北',   lat: 24.8081784, lng: 121.0378278, radius: 200 },
+  { name: '高鐵_台南',   lat: 22.9246367, lng: 120.2830797, radius: 200 }
+];
+
+function haversineMeters(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findNearestKnownLocation(lat, lng){
+  let best = null;
+  KNOWN_LOCATIONS.forEach(loc => {
+    if (loc.lat == null || loc.lng == null) return; // 尚未填座標的地點先略過
+    const d = haversineMeters(lat, lng, loc.lat, loc.lng);
+    if (d <= loc.radius && (!best || d < best.distance)) {
+      best = { name: loc.name, distance: d };
+    }
+  });
+  return best;
+}
+
+// ============ 查詢附近地址（找不到已知地點時的備援）============
+async function reverseGeocode(lat, lng){
+  try {
+    const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat +
+                '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=zh-TW';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data && data.address) {
+      const a = data.address;
+      const parts = [a.road, a.suburb || a.town || a.city_district, a.city || a.county].filter(Boolean);
+      return parts.length ? parts.join(' ') : (data.display_name || '無法辨識地址');
+    }
+    return '無法辨識地址';
+  } catch (err) {
+    console.error(err);
+    return '地址查詢失敗';
+  }
+}
+
+// ============ 定位 ============
+function locateNow(){
+  const status = document.getElementById('locStatus');
+  if (!navigator.geolocation) { status.textContent = '此裝置不支援定位'; return; }
+  status.textContent = '定位中…';
+  status.classList.remove('ok');
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      currentLoc.lat = pos.coords.latitude.toFixed(6);
+      currentLoc.lng = pos.coords.longitude.toFixed(6);
+
+      const matched = findNearestKnownLocation(pos.coords.latitude, pos.coords.longitude);
+      if (matched) {
+        status.textContent = '目前位置：' + matched.name + '（約 ' + Math.round(matched.distance) + ' 公尺內）';
+        status.classList.add('ok');
+        const hasOption = Array.from(fLocationSelect.options).some(o => o.value === matched.name);
+        if (hasOption) {
+          fLocationSelect.value = matched.name;
+          fLocationInput.style.display = 'none';
+        }
+        return;
+      }
+
+      status.textContent = '查詢附近地址中…';
+      const address = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+      status.textContent = '目前位置：' + address;
+      status.classList.add('ok');
+    },
+    err => { status.textContent = '定位失敗：' + err.message; },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+document.getElementById('btnLocate').addEventListener('click', locateNow);
+locateNow(); // 開啟頁面時自動定位一次
+
+// ============ 拍照：從相簿選擇 ============
+document.getElementById('btnGallery').addEventListener('click', () => {
+  document.getElementById('fPhoto').click();
+});
+
+document.getElementById('fPhoto').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    currentPhotoBase64 = reader.result;
+    const preview = document.getElementById('photoPreview');
+    preview.src = currentPhotoBase64;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+// ============ 拍照：啟動相機 ============
+const cameraView = document.getElementById('cameraView');
+const cameraStreamEl = document.getElementById('cameraStream');
+const captureCanvas = document.getElementById('captureCanvas');
+let mediaStream = null;
+
+document.getElementById('btnCamera').addEventListener('click', async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('此瀏覽器不支援相機功能，請改用「從相簿選擇」');
+    return;
+  }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    cameraStreamEl.srcObject = mediaStream;
+    cameraView.style.display = 'block';
+  } catch (err) {
+    showToast('無法啟動相機，請確認已允許相機權限');
+    console.error(err);
+  }
+});
+
+document.getElementById('btnCapture').addEventListener('click', () => {
+  const w = cameraStreamEl.videoWidth;
+  const h = cameraStreamEl.videoHeight;
+  if (!w || !h) { showToast('相機尚未就緒，請稍等一下再試'); return; }
+  captureCanvas.width = w;
+  captureCanvas.height = h;
+  captureCanvas.getContext('2d').drawImage(cameraStreamEl, 0, 0, w, h);
+  currentPhotoBase64 = captureCanvas.toDataURL('image/jpeg', 0.85);
+
+  const preview = document.getElementById('photoPreview');
+  preview.src = currentPhotoBase64;
+  preview.style.display = 'block';
+  stopCamera();
+});
+
+document.getElementById('btnCancelCamera').addEventListener('click', stopCamera);
+
+function stopCamera(){
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+  cameraView.style.display = 'none';
+}
+
+// ============ 送出記錄 ============
+document.getElementById('btnSubmit').addEventListener('click', async () => {
+  const location = getLocationValue();
+  if (!location) { showToast('請填寫地點'); return; }
+  if (APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) { showToast('尚未設定 Apps Script 網址'); return; }
+
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true; btn.textContent = '送出中…';
+
+  const payload = {
+    action: 'create',
+    userId: currentUser.userId,
+    type: document.getElementById('fType').value,
+    location: location,
+    transport: document.getElementById('fTransport').value,
+    lat: currentLoc.lat,
+    lng: currentLoc.lng,
+    photoBase64: currentPhotoBase64,
+    overtime: document.getElementById('fOvertime').checked,
+    note: document.getElementById('fNote').value.trim()
+  };
+
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('已新增記錄');
+      resetForm();
+    } else {
+      showToast('送出失敗：' + (data.error || '未知錯誤'));
+    }
+  } catch(err){
+    showToast('連線失敗，請檢查網路');
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = '送出記錄';
+  }
+});
+
+function resetForm(){
+  fLocationInput.value = '';
+  fLocationInput.style.display = 'none';
+  document.getElementById('fNote').value = '';
+  document.getElementById('fOvertime').checked = false;
+  document.getElementById('fPhoto').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+  stopCamera();
+  currentLoc = { lat: '', lng: '' };
+  locateNow(); // 送出後下一筆通常是不同地點，重新自動定位
+  currentPhotoBase64 = '';
+}
+
+// ============ 待報帳清單 ============
+async function loadList(){
+  const container = document.getElementById('listContainer');
+  if (APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
+    container.innerHTML = '<div class="empty">尚未設定 Apps Script 網址</div>';
+    return;
+  }
+  container.innerHTML = '<div class="empty">載入中…</div>';
+
+  try{
+    const url = APPS_SCRIPT_URL + '?action=list&userId=' + encodeURIComponent(currentUser.userId) + '&limit=30';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.success) { container.innerHTML = '<div class="empty">讀取失敗</div>'; return; }
+    renderList(data.records);
+  } catch(err){
+    container.innerHTML = '<div class="empty">連線失敗，請檢查網路</div>';
+    console.error(err);
+  }
+}
+
+function renderList(records){
+  const container = document.getElementById('listContainer');
+  if (!records || records.length === 0) {
+    container.innerHTML = '<div class="empty">目前沒有記錄</div>';
+    return;
+  }
+  container.innerHTML = '';
+  records.forEach(r => {
+    const isPending = r['報帳狀態'] !== '已報帳';
+    const div = document.createElement('div');
+    div.className = 'record';
+    div.innerHTML =
+      '<div class="record-top">' +
+        '<div><div class="record-loc">' + escapeHtml(r['地點'] || '（未填地點）') + '</div>' +
+        '<div class="record-time">' + escapeHtml(String(r['時間戳記'] || '')) + '</div></div>' +
+        '<span class="badge ' + (isPending ? 'badge-pending' : 'badge-done') + '">' + (isPending ? '待報帳' : '已報帳') + '</span>' +
+      '</div>' +
+      '<div class="record-meta">' + escapeHtml(r['事件類型'] || '') + ' · ' + escapeHtml(r['交通方式'] || '') +
+        (r['加班標記'] === '是' ? ' · 已申報加班' : '') + '</div>' +
+      (r['備註'] ? '<div class="record-meta">備註：' + escapeHtml(r['備註']) + '</div>' : '') +
+      (isPending ? '<div class="record-actions"><button data-id="' + escapeHtml(r['記錄ID']) + '">標記已報帳</button></div>' : '');
+    container.appendChild(div);
+  });
+
+  container.querySelectorAll('.record-actions button').forEach(btn => {
+    btn.addEventListener('click', () => markDone(btn.dataset.id, btn));
+  });
+}
+
+async function markDone(id, btn){
+  btn.disabled = true; btn.textContent = '更新中…';
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'update', id: id, status: '已報帳' })
+    });
+    const data = await res.json();
+    if (data.success) { showToast('已標記為已報帳'); loadList(); }
+    else { showToast('更新失敗：' + (data.error || '未知錯誤')); btn.disabled = false; btn.textContent = '標記已報帳'; }
+  } catch(err){
+    showToast('連線失敗'); btn.disabled = false; btn.textContent = '標記已報帳';
+  }
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+
+// ============ 提示訊息 ============
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
