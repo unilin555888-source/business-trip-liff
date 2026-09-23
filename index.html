@@ -56,6 +56,9 @@
   select{ font-weight:500; }
   textarea{ resize:vertical; min-height:70px; }
   .checkbox-row{ display:flex; align-items:center; gap:8px; }
+  .checkbox-group{ display:flex; flex-wrap:wrap; gap:12px 18px; }
+  .checkbox-group .checkbox-row{ font-size:15px; font-weight:500; }
+  .checkbox-group input{ width:18px; height:18px; }
   .checkbox-row input{ width:18px; height:18px; }
   .checkbox-row label{ margin:0; font-weight:500; }
   .btn{
@@ -91,6 +94,9 @@
     font-size:13px; font-weight:700; padding:8px 14px; border-radius:7px;
     border:1px solid var(--navy-2); background:#fff; color:var(--navy-2);
   }
+  .record-actions .btn-action-undo{
+    border-color:var(--line); color:var(--muted); font-weight:500;
+  }
   .empty{ text-align:center; color:var(--muted); font-size:14px; padding:40px 20px; }
   #toast{
     position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
@@ -111,6 +117,7 @@
 <nav class="tabs">
   <button id="tabNew" class="active">新增記錄</button>
   <button id="tabList">待報帳清單</button>
+  <button id="tabHours">工時記錄</button>
 </nav>
 
 <main>
@@ -118,12 +125,37 @@
   <section id="viewNew">
     <div class="card">
       <div class="field">
+        <label>類別</label>
+        <div class="checkbox-group">
+          <label class="checkbox-row"><input type="radio" name="fCategory" value="trip" checked> 出差記錄</label>
+          <label class="checkbox-row"><input type="radio" name="fCategory" value="punch"> 打卡</label>
+        </div>
+      </div>
+      <div class="field trip-only">
         <label>事件類型</label>
         <select id="fType">
           <option value="出發">出發</option>
           <option value="抵達">抵達</option>
           <option value="其他">其他</option>
         </select>
+      </div>
+      <div class="field punch-only" style="display:none;">
+        <label>工作類型</label>
+        <select id="fWorkType">
+          <option value="打工">打工</option>
+          <option value="正職">正職</option>
+        </select>
+      </div>
+      <div class="field punch-only" style="display:none;">
+        <label>動作</label>
+        <select id="fPunchAction">
+          <option value="上班">上班</option>
+          <option value="下班">下班</option>
+        </select>
+      </div>
+      <div class="field punch-only" id="punchOvertimeField" style="display:none;">
+        <label>加班時數</label>
+        <input type="text" inputmode="decimal" id="fPunchOvertimeHours" placeholder="例如：2">
       </div>
       <div class="field">
         <label>地點</label>
@@ -143,22 +175,28 @@
         </select>
         <input type="text" id="fLocation" placeholder="輸入地點名稱" style="display:none; margin-top:8px;">
       </div>
+      <div class="field trip-only">
+        <label>交通方式（可複選）</label>
+        <div class="checkbox-group">
+          <label class="checkbox-row"><input type="checkbox" class="fTransportOpt" value="高鐵"> 高鐵</label>
+          <label class="checkbox-row"><input type="checkbox" class="fTransportOpt" value="台鐵"> 台鐵</label>
+          <label class="checkbox-row"><input type="checkbox" class="fTransportOpt" value="自駕"> 自駕</label>
+          <label class="checkbox-row"><input type="checkbox" class="fTransportOpt" value="停車"> 停車</label>
+          <label class="checkbox-row"><input type="checkbox" class="fTransportOpt" value="客運"> 客運</label>
+          <label class="checkbox-row"><input type="checkbox" class="fTransportOpt" value="其他"> 其他</label>
+        </div>
+      </div>
       <div class="field">
-        <label>交通方式</label>
-        <select id="fTransport">
-          <option value="高鐵">高鐵</option>
-          <option value="台鐵">台鐵</option>
-          <option value="自駕">自駕</option>
-          <option value="客運">客運</option>
-          <option value="其他">其他</option>
-        </select>
+        <label>記錄時間</label>
+        <input type="datetime-local" id="fDateTime">
+        <div class="hint">預設帶入現在時間，事後補登可以自行調整。</div>
       </div>
       <div class="field">
         <label>目前位置</label>
         <button type="button" class="btn btn-secondary" id="btnLocate">重新定位</button>
         <div class="loc-status" id="locStatus">開啟頁面時會自動定位</div>
       </div>
-      <div class="field">
+      <div class="field trip-only">
         <label>拍照</label>
         <div class="row-2">
           <button type="button" class="btn btn-secondary" id="btnCamera">啟動相機拍照</button>
@@ -175,11 +213,16 @@
         <canvas id="captureCanvas" style="display:none;"></canvas>
         <img id="photoPreview" class="photo-preview">
       </div>
-      <div class="field">
+      <div class="field trip-only">
         <div class="checkbox-row">
           <input type="checkbox" id="fOvertime">
           <label for="fOvertime">是否申報加班</label>
         </div>
+      </div>
+      <div class="field trip-only" id="tripOvertimeHoursField" style="display:none;">
+        <label>加班時數</label>
+        <input type="text" inputmode="decimal" id="fTripOvertimeHours" placeholder="例如：2">
+        <div class="hint">會一併計入工時記錄與日曆，跟打卡的加班統計併在一起。</div>
       </div>
       <div class="field">
         <label>備註</label>
@@ -195,6 +238,13 @@
   <!-- 待報帳清單 -->
   <section id="viewList" hidden>
     <div id="listContainer">
+      <div class="empty">載入中…</div>
+    </div>
+  </section>
+
+  <!-- 工時記錄（檢視用） -->
+  <section id="viewHours" hidden>
+    <div id="hoursContainer">
       <div class="empty">載入中…</div>
     </div>
   </section>
@@ -232,17 +282,30 @@ initLiff();
 // ============ 分頁切換 ============
 const tabNew = document.getElementById('tabNew');
 const tabList = document.getElementById('tabList');
+const tabHours = document.getElementById('tabHours');
 const viewNew = document.getElementById('viewNew');
 const viewList = document.getElementById('viewList');
+const viewHours = document.getElementById('viewHours');
+
+function activateTab(tab){
+  [tabNew, tabList, tabHours].forEach(t => t.classList.remove('active'));
+  [viewNew, viewList, viewHours].forEach(v => v.hidden = true);
+  tab.classList.add('active');
+}
 
 tabNew.addEventListener('click', () => {
-  tabNew.classList.add('active'); tabList.classList.remove('active');
-  viewNew.hidden = false; viewList.hidden = true;
+  activateTab(tabNew);
+  viewNew.hidden = false;
 });
 tabList.addEventListener('click', () => {
-  tabList.classList.add('active'); tabNew.classList.remove('active');
-  viewList.hidden = false; viewNew.hidden = true;
+  activateTab(tabList);
+  viewList.hidden = false;
   loadList();
+});
+tabHours.addEventListener('click', () => {
+  activateTab(tabHours);
+  viewHours.hidden = false;
+  loadHours();
 });
 
 // ============ 地點：預設下拉 / 自行輸入 ============
@@ -260,6 +323,65 @@ fLocationSelect.addEventListener('change', () => {
 function getLocationValue(){
   return fLocationSelect.value === '__custom__' ? fLocationInput.value.trim() : fLocationSelect.value;
 }
+
+// ============ 類別切換：出差記錄 / 打卡 ============
+const categoryRadios = document.querySelectorAll('input[name="fCategory"]');
+const fWorkType = document.getElementById('fWorkType');
+const fPunchAction = document.getElementById('fPunchAction');
+const punchOvertimeField = document.getElementById('punchOvertimeField');
+const fOvertimeCheckbox = document.getElementById('fOvertime');
+const tripOvertimeHoursField = document.getElementById('tripOvertimeHoursField');
+
+function currentCategory(){
+  return document.querySelector('input[name="fCategory"]:checked').value;
+}
+
+function updateCategoryVisibility(){
+  const cat = currentCategory();
+  document.querySelectorAll('.trip-only').forEach(el => { el.style.display = cat === 'trip' ? '' : 'none'; });
+  document.querySelectorAll('.punch-only').forEach(el => { el.style.display = cat === 'punch' ? '' : 'none'; });
+  if (cat === 'punch') updatePunchOvertimeVisibility();
+}
+categoryRadios.forEach(r => r.addEventListener('change', updateCategoryVisibility));
+
+function updatePunchActionOptions(){
+  const isFullTime = fWorkType.value === '正職';
+  fPunchAction.innerHTML = '<option value="上班">上班</option><option value="下班">下班</option>' +
+    (isFullTime ? '<option value="加班">加班</option>' : '');
+  updatePunchOvertimeVisibility();
+}
+function updatePunchOvertimeVisibility(){
+  const show = currentCategory() === 'punch' && fPunchAction.value === '加班';
+  punchOvertimeField.style.display = show ? '' : 'none';
+}
+fWorkType.addEventListener('change', updatePunchActionOptions);
+fPunchAction.addEventListener('change', updatePunchOvertimeVisibility);
+updatePunchActionOptions();
+
+fOvertimeCheckbox.addEventListener('change', function(){
+  tripOvertimeHoursField.style.display = this.checked ? '' : 'none';
+});
+
+// ============ 交通方式：複選 ============
+function getTransportValue(){
+  return Array.from(document.querySelectorAll('.fTransportOpt:checked'))
+    .map(el => el.value)
+    .join('、');
+}
+function resetTransport(){
+  document.querySelectorAll('.fTransportOpt:checked').forEach(el => el.checked = false);
+}
+
+// ============ 記錄時間：預設現在，可自行調整 ============
+function localDateTimeValue(date){
+  const pad = n => String(n).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+         'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+}
+function resetDateTime(){
+  document.getElementById('fDateTime').value = localDateTimeValue(new Date());
+}
+resetDateTime(); // 頁面載入時先帶入現在時間
 
 // ============ 已知地點清單（用於自動偵測目前位置）============
 // 把 lat/lng 換成每個地點實際的座標即可啟用自動偵測；
@@ -423,25 +545,62 @@ function stopCamera(){
 
 // ============ 送出記錄 ============
 document.getElementById('btnSubmit').addEventListener('click', async () => {
-  const location = getLocationValue();
-  if (!location) { showToast('請填寫地點'); return; }
   if (APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) { showToast('尚未設定 Apps Script 網址'); return; }
+
+  const cat = currentCategory();
+  const location = getLocationValue();
+  const timestamp = document.getElementById('fDateTime').value;
+  const note = document.getElementById('fNote').value.trim();
+
+  let payload;
+
+  if (cat === 'trip') {
+    if (!location) { showToast('請填寫地點'); return; }
+    const overtimeChecked = document.getElementById('fOvertime').checked;
+    const overtimeHours = overtimeChecked ? parseFloat(document.getElementById('fTripOvertimeHours').value) : 0;
+    if (overtimeChecked && (!overtimeHours || overtimeHours <= 0)) {
+      showToast('已勾選加班，請填寫加班時數');
+      return;
+    }
+    payload = {
+      action: 'create',
+      userId: currentUser.userId,
+      userName: currentUser.displayName,
+      type: document.getElementById('fType').value,
+      location: location,
+      transport: getTransportValue(),
+      timestamp: timestamp,
+      lat: currentLoc.lat,
+      lng: currentLoc.lng,
+      photoBase64: currentPhotoBase64,
+      overtime: overtimeChecked,
+      overtimeHours: overtimeHours,
+      note: note
+    };
+  } else {
+    const punchAction = fPunchAction.value;
+    const overtimeHours = punchAction === '加班' ? parseFloat(document.getElementById('fPunchOvertimeHours').value) : 0;
+    if (punchAction === '加班' && (!overtimeHours || overtimeHours <= 0)) {
+      showToast('請填寫加班時數');
+      return;
+    }
+    payload = {
+      action: 'punch',
+      userId: currentUser.userId,
+      userName: currentUser.displayName,
+      workType: fWorkType.value,
+      punchAction: punchAction,
+      overtimeHours: overtimeHours,
+      location: location,
+      lat: currentLoc.lat,
+      lng: currentLoc.lng,
+      timestamp: timestamp,
+      note: note
+    };
+  }
 
   const btn = document.getElementById('btnSubmit');
   btn.disabled = true; btn.textContent = '送出中…';
-
-  const payload = {
-    action: 'create',
-    userId: currentUser.userId,
-    type: document.getElementById('fType').value,
-    location: location,
-    transport: document.getElementById('fTransport').value,
-    lat: currentLoc.lat,
-    lng: currentLoc.lng,
-    photoBase64: currentPhotoBase64,
-    overtime: document.getElementById('fOvertime').checked,
-    note: document.getElementById('fNote').value.trim()
-  };
 
   try{
     const res = await fetch(APPS_SCRIPT_URL, {
@@ -451,7 +610,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
     });
     const data = await res.json();
     if (data.success) {
-      showToast('已新增記錄');
+      showToast(cat === 'trip' ? '已新增記錄' : ('已記錄：' + payload.workType + payload.punchAction));
       resetForm();
     } else {
       showToast('送出失敗：' + (data.error || '未知錯誤'));
@@ -467,8 +626,13 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
 function resetForm(){
   fLocationInput.value = '';
   fLocationInput.style.display = 'none';
+  resetTransport();
+  resetDateTime();
   document.getElementById('fNote').value = '';
   document.getElementById('fOvertime').checked = false;
+  tripOvertimeHoursField.style.display = 'none';
+  document.getElementById('fTripOvertimeHours').value = '';
+  document.getElementById('fPunchOvertimeHours').value = '';
   document.getElementById('fPhoto').value = '';
   document.getElementById('photoPreview').style.display = 'none';
   stopCamera();
@@ -509,6 +673,9 @@ function renderList(records){
     const isPending = r['報帳狀態'] !== '已報帳';
     const div = document.createElement('div');
     div.className = 'record';
+    const actionBtn = isPending
+      ? '<button class="btn-action-pending" data-id="' + escapeHtml(r['記錄ID']) + '" data-target="已報帳">標記已報帳</button>'
+      : '<button class="btn-action-undo" data-id="' + escapeHtml(r['記錄ID']) + '" data-target="待報帳">取消已報帳</button>';
     div.innerHTML =
       '<div class="record-top">' +
         '<div><div class="record-loc">' + escapeHtml(r['地點'] || '（未填地點）') + '</div>' +
@@ -518,33 +685,92 @@ function renderList(records){
       '<div class="record-meta">' + escapeHtml(r['事件類型'] || '') + ' · ' + escapeHtml(r['交通方式'] || '') +
         (r['加班標記'] === '是' ? ' · 已申報加班' : '') + '</div>' +
       (r['備註'] ? '<div class="record-meta">備註：' + escapeHtml(r['備註']) + '</div>' : '') +
-      (isPending ? '<div class="record-actions"><button data-id="' + escapeHtml(r['記錄ID']) + '">標記已報帳</button></div>' : '');
+      '<div class="record-actions">' + actionBtn + '</div>';
     container.appendChild(div);
   });
 
   container.querySelectorAll('.record-actions button').forEach(btn => {
-    btn.addEventListener('click', () => markDone(btn.dataset.id, btn));
+    btn.addEventListener('click', () => updateStatus(btn.dataset.id, btn.dataset.target, btn));
   });
 }
 
-async function markDone(id, btn){
+async function updateStatus(id, targetStatus, btn){
+  const originalText = btn.textContent;
   btn.disabled = true; btn.textContent = '更新中…';
   try{
     const res = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'update', id: id, status: '已報帳' })
+      body: JSON.stringify({ action: 'update', id: id, status: targetStatus })
     });
     const data = await res.json();
-    if (data.success) { showToast('已標記為已報帳'); loadList(); }
-    else { showToast('更新失敗：' + (data.error || '未知錯誤')); btn.disabled = false; btn.textContent = '標記已報帳'; }
+    if (data.success) { showToast(targetStatus === '已報帳' ? '已標記為已報帳' : '已改回待報帳'); loadList(); }
+    else { showToast('更新失敗：' + (data.error || '未知錯誤')); btn.disabled = false; btn.textContent = originalText; }
   } catch(err){
-    showToast('連線失敗'); btn.disabled = false; btn.textContent = '標記已報帳';
+    showToast('連線失敗'); btn.disabled = false; btn.textContent = originalText;
   }
 }
 
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+
+// ============ 工時記錄（檢視用）============
+async function loadHours(){
+  const container = document.getElementById('hoursContainer');
+  if (APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
+    container.innerHTML = '<div class="empty">尚未設定 Apps Script 網址</div>';
+    return;
+  }
+  container.innerHTML = '<div class="empty">載入中…</div>';
+
+  try{
+    const url = APPS_SCRIPT_URL + '?action=listHours&userId=' + encodeURIComponent(currentUser.userId) + '&limit=50';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.success) { container.innerHTML = '<div class="empty">讀取失敗</div>'; return; }
+    renderHours(data.records);
+  } catch(err){
+    container.innerHTML = '<div class="empty">連線失敗，請檢查網路</div>';
+    console.error(err);
+  }
+}
+
+function renderHours(records){
+  const container = document.getElementById('hoursContainer');
+  if (!records || records.length === 0) {
+    container.innerHTML = '<div class="empty">目前沒有記錄</div>';
+    return;
+  }
+  container.innerHTML = '';
+  records.forEach(r => {
+    const isOpen = r['上班時間'] && !r['下班時間'];
+    const div = document.createElement('div');
+    div.className = 'record';
+
+    let timeLine;
+    if (r['下班時間']) {
+      timeLine = escapeHtml(r['上班時間']) + ' → ' + escapeHtml(r['下班時間']);
+    } else {
+      timeLine = escapeHtml(r['上班時間']) + '（進行中）';
+    }
+
+    let metaBits = [];
+    if (r['時數']) metaBits.push(r['時數'] + ' 小時');
+    if (r['薪資']) metaBits.push('$' + r['薪資']);
+    if (r['加班時數']) metaBits.push('加班 ' + r['加班時數'] + ' 小時');
+
+    div.innerHTML =
+      '<div class="record-top">' +
+        '<div><div class="record-loc">' + escapeHtml(r['工作類型'] || '') + (r['加班時數'] ? '・加班' : '') + '</div>' +
+        '<div class="record-time">' + timeLine + '</div></div>' +
+        (isOpen ? '<span class="badge badge-pending">進行中</span>' : '') +
+      '</div>' +
+      (metaBits.length ? '<div class="record-meta">' + metaBits.join(' · ') + '</div>' : '') +
+      (r['地點'] ? '<div class="record-meta">地點：' + escapeHtml(r['地點']) + '</div>' : '') +
+      (r['備註'] ? '<div class="record-meta">備註：' + escapeHtml(r['備註']) + '</div>' : '');
+    container.appendChild(div);
+  });
 }
 
 // ============ 提示訊息 ============
