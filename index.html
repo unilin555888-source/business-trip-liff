@@ -66,6 +66,10 @@
     text-align:center; font-family:inherit;
   }
   .action-btn.selected{ background:var(--navy-2); border-color:var(--navy-2); color:#fff; }
+  .link-toggle{
+    background:none; border:none; color:var(--navy-2); font-weight:600; font-size:14px;
+    padding:2px 0; text-align:left; font-family:inherit;
+  }
   .checkbox-row input{ width:18px; height:18px; }
   .checkbox-row label{ margin:0; font-weight:500; }
   .btn{
@@ -141,12 +145,35 @@
           <button type="button" class="action-btn" data-action="打工下班">打工下班</button>
           <button type="button" class="action-btn" data-action="正職上班">正職上班</button>
           <button type="button" class="action-btn" data-action="正職下班">正職下班</button>
-          <button type="button" class="action-btn" data-action="正職加班">正職加班</button>
         </div>
       </div>
       <div class="field punch-only" id="punchOvertimeField" style="display:none;">
         <label>加班時數</label>
-        <input type="text" inputmode="decimal" id="fPunchOvertimeHours" placeholder="例如：2">
+        <input type="text" inputmode="decimal" id="fPunchOvertimeHours" value="0" placeholder="0">
+        <div class="hint">沒有加班留 0 就好。</div>
+      </div>
+      <div class="field trip-only">
+        <button type="button" id="btnTogglePunchLink" class="link-toggle">+ 這同時也是我的上/下班</button>
+        <div id="punchLinkFields" style="display:none; margin-top:10px;">
+          <div class="field" style="margin-bottom:10px;">
+            <label>身份</label>
+            <select id="fLinkWorkType">
+              <option value="正職">正職</option>
+              <option value="打工">打工</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>上班還是下班</label>
+            <select id="fLinkPunchAction">
+              <option value="上班">上班</option>
+              <option value="下班">下班</option>
+            </select>
+          </div>
+          <div class="field" id="linkOvertimeField" style="display:none; margin-top:10px; margin-bottom:0;">
+            <label>加班時數</label>
+            <input type="text" inputmode="decimal" id="fLinkOvertimeHours" value="0" placeholder="0">
+          </div>
+        </div>
       </div>
       <div class="field">
         <label>地點</label>
@@ -325,8 +352,7 @@ const ACTIONS = {
   '打工上班': { category: 'punch', workType: '打工', punchAction: '上班' },
   '打工下班': { category: 'punch', workType: '打工', punchAction: '下班' },
   '正職上班': { category: 'punch', workType: '正職', punchAction: '上班' },
-  '正職下班': { category: 'punch', workType: '正職', punchAction: '下班' },
-  '正職加班': { category: 'punch', workType: '正職', punchAction: '加班' }
+  '正職下班': { category: 'punch', workType: '正職', punchAction: '下班' }
 };
 let selectedAction = '出發';
 
@@ -339,7 +365,7 @@ function updateActionVisibility(){
   const isTrip = meta.category === 'trip';
   document.querySelectorAll('.trip-only').forEach(el => { el.style.display = isTrip ? '' : 'none'; });
   document.querySelectorAll('.punch-only').forEach(el => { el.style.display = !isTrip ? '' : 'none'; });
-  punchOvertimeField.style.display = (!isTrip && meta.punchAction === '加班') ? '' : 'none';
+  punchOvertimeField.style.display = (!isTrip && meta.punchAction === '下班') ? '' : 'none';
 }
 
 document.querySelectorAll('.action-btn').forEach(btn => {
@@ -355,6 +381,33 @@ updateActionVisibility();
 fOvertimeCheckbox.addEventListener('change', function(){
   tripOvertimeHoursField.style.display = this.checked ? '' : 'none';
 });
+
+// ============ 出差同時也是上/下班（可展開的連動小字）============
+const btnTogglePunchLink = document.getElementById('btnTogglePunchLink');
+const punchLinkFields = document.getElementById('punchLinkFields');
+const fLinkWorkType = document.getElementById('fLinkWorkType');
+const fLinkPunchAction = document.getElementById('fLinkPunchAction');
+const linkOvertimeField = document.getElementById('linkOvertimeField');
+
+btnTogglePunchLink.addEventListener('click', () => {
+  const willShow = punchLinkFields.style.display === 'none';
+  punchLinkFields.style.display = willShow ? 'block' : 'none';
+  btnTogglePunchLink.textContent = willShow ? '－ 取消連動上/下班' : '+ 這同時也是我的上/下班';
+});
+fLinkPunchAction.addEventListener('change', () => {
+  linkOvertimeField.style.display = fLinkPunchAction.value === '下班' ? '' : 'none';
+});
+function isPunchLinkActive(){
+  return punchLinkFields.style.display !== 'none';
+}
+function resetPunchLink(){
+  punchLinkFields.style.display = 'none';
+  btnTogglePunchLink.textContent = '+ 這同時也是我的上/下班';
+  fLinkWorkType.value = '正職';
+  fLinkPunchAction.value = '上班';
+  linkOvertimeField.style.display = 'none';
+  document.getElementById('fLinkOvertimeHours').value = '0';
+}
 
 // ============ 交通方式：複選 ============
 function getTransportValue(){
@@ -537,6 +590,16 @@ function stopCamera(){
   cameraView.style.display = 'none';
 }
 
+// ============ 呼叫後端的共用函式 ============
+async function callApi(payload){
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
 // ============ 送出記錄 ============
 document.getElementById('btnSubmit').addEventListener('click', async () => {
   if (APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) { showToast('尚未設定 Apps Script 網址'); return; }
@@ -548,6 +611,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
   const note = document.getElementById('fNote').value.trim();
 
   let payload;
+  let linkedPunchPayload = null;
 
   if (cat === 'trip') {
     if (!location) { showToast('請填寫地點'); return; }
@@ -572,13 +636,27 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
       overtimeHours: overtimeHours,
       note: note
     };
+
+    if (isPunchLinkActive()) {
+      const linkPunchAction = fLinkPunchAction.value;
+      const linkOvertimeHours = linkPunchAction === '下班' ? (parseFloat(document.getElementById('fLinkOvertimeHours').value) || 0) : 0;
+      linkedPunchPayload = {
+        action: 'punch',
+        userId: currentUser.userId,
+        userName: currentUser.displayName,
+        workType: fLinkWorkType.value,
+        punchAction: linkPunchAction,
+        overtimeHours: linkOvertimeHours,
+        location: location,
+        lat: currentLoc.lat,
+        lng: currentLoc.lng,
+        timestamp: timestamp,
+        note: '（出差同時打卡）'
+      };
+    }
   } else {
     const punchAction = meta.punchAction;
-    const overtimeHours = punchAction === '加班' ? parseFloat(document.getElementById('fPunchOvertimeHours').value) : 0;
-    if (punchAction === '加班' && (!overtimeHours || overtimeHours <= 0)) {
-      showToast('請填寫加班時數');
-      return;
-    }
+    const overtimeHours = punchAction === '下班' ? (parseFloat(document.getElementById('fPunchOvertimeHours').value) || 0) : 0;
     payload = {
       action: 'punch',
       userId: currentUser.userId,
@@ -598,18 +676,24 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = '送出中…';
 
   try{
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(cat === 'trip' ? '已新增記錄' : ('已記錄：' + payload.workType + payload.punchAction));
-      resetForm();
-    } else {
+    const data = await callApi(payload);
+    if (!data.success) {
       showToast('送出失敗：' + (data.error || '未知錯誤'));
+      return;
     }
+
+    if (linkedPunchPayload) {
+      const punchData = await callApi(linkedPunchPayload);
+      if (!punchData.success) {
+        showToast('出差已記錄，但打卡失敗：' + (punchData.error || '未知錯誤'));
+        resetForm();
+        return;
+      }
+      showToast('已新增記錄，並同步打卡');
+    } else {
+      showToast(cat === 'trip' ? '已新增記錄' : ('已記錄：' + payload.workType + payload.punchAction));
+    }
+    resetForm();
   } catch(err){
     showToast('連線失敗，請檢查網路');
     console.error(err);
@@ -622,6 +706,7 @@ function resetForm(){
   fLocationInput.value = '';
   fLocationInput.style.display = 'none';
   locationManuallySet = false;
+  resetPunchLink();
   resetTransport();
   resetDateTime();
   document.getElementById('fNote').value = '';
