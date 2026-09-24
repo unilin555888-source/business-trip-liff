@@ -59,6 +59,13 @@
   .checkbox-group{ display:flex; flex-wrap:wrap; gap:12px 18px; }
   .checkbox-group .checkbox-row{ font-size:15px; font-weight:500; }
   .checkbox-group input{ width:18px; height:18px; }
+  .action-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .action-btn{
+    padding:14px 4px; border:1px solid var(--line); border-radius:8px;
+    background:#fff; color:var(--ink); font-size:14px; font-weight:700;
+    text-align:center; font-family:inherit;
+  }
+  .action-btn.selected{ background:var(--navy-2); border-color:var(--navy-2); color:#fff; }
   .checkbox-row input{ width:18px; height:18px; }
   .checkbox-row label{ margin:0; font-weight:500; }
   .btn{
@@ -125,33 +132,17 @@
   <section id="viewNew">
     <div class="card">
       <div class="field">
-        <label>類別</label>
-        <div class="checkbox-group">
-          <label class="checkbox-row"><input type="radio" name="fCategory" value="trip" checked> 出差記錄</label>
-          <label class="checkbox-row"><input type="radio" name="fCategory" value="punch"> 打卡</label>
-        </div>
-      </div>
-      <div class="field trip-only">
-        <label>事件類型</label>
-        <select id="fType">
-          <option value="出發">出發</option>
-          <option value="抵達">抵達</option>
-          <option value="其他">其他</option>
-        </select>
-      </div>
-      <div class="field punch-only" style="display:none;">
-        <label>工作類型</label>
-        <select id="fWorkType">
-          <option value="打工">打工</option>
-          <option value="正職">正職</option>
-        </select>
-      </div>
-      <div class="field punch-only" style="display:none;">
         <label>動作</label>
-        <select id="fPunchAction">
-          <option value="上班">上班</option>
-          <option value="下班">下班</option>
-        </select>
+        <div class="action-grid" id="actionGrid">
+          <button type="button" class="action-btn trip-action selected" data-action="出發">出發</button>
+          <button type="button" class="action-btn trip-action" data-action="抵達">抵達</button>
+          <button type="button" class="action-btn trip-action" data-action="其他">其他</button>
+          <button type="button" class="action-btn" data-action="打工上班">打工上班</button>
+          <button type="button" class="action-btn" data-action="打工下班">打工下班</button>
+          <button type="button" class="action-btn" data-action="正職上班">正職上班</button>
+          <button type="button" class="action-btn" data-action="正職下班">正職下班</button>
+          <button type="button" class="action-btn" data-action="正職加班">正職加班</button>
+        </div>
       </div>
       <div class="field punch-only" id="punchOvertimeField" style="display:none;">
         <label>加班時數</label>
@@ -311,7 +302,9 @@ tabHours.addEventListener('click', () => {
 // ============ 地點：預設下拉 / 自行輸入 ============
 const fLocationSelect = document.getElementById('fLocationSelect');
 const fLocationInput = document.getElementById('fLocation');
+let locationManuallySet = false;
 fLocationSelect.addEventListener('change', () => {
+  locationManuallySet = true;
   if (fLocationSelect.value === '__custom__') {
     fLocationInput.style.display = 'block';
     fLocationInput.value = '';
@@ -324,39 +317,40 @@ function getLocationValue(){
   return fLocationSelect.value === '__custom__' ? fLocationInput.value.trim() : fLocationSelect.value;
 }
 
-// ============ 類別切換：出差記錄 / 打卡 ============
-const categoryRadios = document.querySelectorAll('input[name="fCategory"]');
-const fWorkType = document.getElementById('fWorkType');
-const fPunchAction = document.getElementById('fPunchAction');
+// ============ 動作按鈕格（取代原本的類別切換 + 事件類型/工作類型/動作三層選單）============
+const ACTIONS = {
+  '出發':    { category: 'trip',  type: '出發' },
+  '抵達':    { category: 'trip',  type: '抵達' },
+  '其他':    { category: 'trip',  type: '其他' },
+  '打工上班': { category: 'punch', workType: '打工', punchAction: '上班' },
+  '打工下班': { category: 'punch', workType: '打工', punchAction: '下班' },
+  '正職上班': { category: 'punch', workType: '正職', punchAction: '上班' },
+  '正職下班': { category: 'punch', workType: '正職', punchAction: '下班' },
+  '正職加班': { category: 'punch', workType: '正職', punchAction: '加班' }
+};
+let selectedAction = '出發';
+
 const punchOvertimeField = document.getElementById('punchOvertimeField');
 const fOvertimeCheckbox = document.getElementById('fOvertime');
 const tripOvertimeHoursField = document.getElementById('tripOvertimeHoursField');
 
-function currentCategory(){
-  return document.querySelector('input[name="fCategory"]:checked').value;
+function updateActionVisibility(){
+  const meta = ACTIONS[selectedAction];
+  const isTrip = meta.category === 'trip';
+  document.querySelectorAll('.trip-only').forEach(el => { el.style.display = isTrip ? '' : 'none'; });
+  document.querySelectorAll('.punch-only').forEach(el => { el.style.display = !isTrip ? '' : 'none'; });
+  punchOvertimeField.style.display = (!isTrip && meta.punchAction === '加班') ? '' : 'none';
 }
 
-function updateCategoryVisibility(){
-  const cat = currentCategory();
-  document.querySelectorAll('.trip-only').forEach(el => { el.style.display = cat === 'trip' ? '' : 'none'; });
-  document.querySelectorAll('.punch-only').forEach(el => { el.style.display = cat === 'punch' ? '' : 'none'; });
-  if (cat === 'punch') updatePunchOvertimeVisibility();
-}
-categoryRadios.forEach(r => r.addEventListener('change', updateCategoryVisibility));
-
-function updatePunchActionOptions(){
-  const isFullTime = fWorkType.value === '正職';
-  fPunchAction.innerHTML = '<option value="上班">上班</option><option value="下班">下班</option>' +
-    (isFullTime ? '<option value="加班">加班</option>' : '');
-  updatePunchOvertimeVisibility();
-}
-function updatePunchOvertimeVisibility(){
-  const show = currentCategory() === 'punch' && fPunchAction.value === '加班';
-  punchOvertimeField.style.display = show ? '' : 'none';
-}
-fWorkType.addEventListener('change', updatePunchActionOptions);
-fPunchAction.addEventListener('change', updatePunchOvertimeVisibility);
-updatePunchActionOptions();
+document.querySelectorAll('.action-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedAction = btn.dataset.action;
+    document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    updateActionVisibility();
+  });
+});
+updateActionVisibility();
 
 fOvertimeCheckbox.addEventListener('change', function(){
   tripOvertimeHoursField.style.display = this.checked ? '' : 'none';
@@ -457,7 +451,7 @@ function locateNow(){
         status.textContent = '目前位置：' + matched.name + '（約 ' + Math.round(matched.distance) + ' 公尺內）';
         status.classList.add('ok');
         const hasOption = Array.from(fLocationSelect.options).some(o => o.value === matched.name);
-        if (hasOption) {
+        if (hasOption && !locationManuallySet) {
           fLocationSelect.value = matched.name;
           fLocationInput.style.display = 'none';
         }
@@ -547,7 +541,8 @@ function stopCamera(){
 document.getElementById('btnSubmit').addEventListener('click', async () => {
   if (APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) { showToast('尚未設定 Apps Script 網址'); return; }
 
-  const cat = currentCategory();
+  const meta = ACTIONS[selectedAction];
+  const cat = meta.category;
   const location = getLocationValue();
   const timestamp = document.getElementById('fDateTime').value;
   const note = document.getElementById('fNote').value.trim();
@@ -566,7 +561,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
       action: 'create',
       userId: currentUser.userId,
       userName: currentUser.displayName,
-      type: document.getElementById('fType').value,
+      type: meta.type,
       location: location,
       transport: getTransportValue(),
       timestamp: timestamp,
@@ -578,7 +573,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
       note: note
     };
   } else {
-    const punchAction = fPunchAction.value;
+    const punchAction = meta.punchAction;
     const overtimeHours = punchAction === '加班' ? parseFloat(document.getElementById('fPunchOvertimeHours').value) : 0;
     if (punchAction === '加班' && (!overtimeHours || overtimeHours <= 0)) {
       showToast('請填寫加班時數');
@@ -588,7 +583,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
       action: 'punch',
       userId: currentUser.userId,
       userName: currentUser.displayName,
-      workType: fWorkType.value,
+      workType: meta.workType,
       punchAction: punchAction,
       overtimeHours: overtimeHours,
       location: location,
@@ -626,6 +621,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
 function resetForm(){
   fLocationInput.value = '';
   fLocationInput.style.display = 'none';
+  locationManuallySet = false;
   resetTransport();
   resetDateTime();
   document.getElementById('fNote').value = '';
