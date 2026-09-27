@@ -313,6 +313,9 @@ fLocationSelect.addEventListener('change', () => {
     fLocationInput.style.display = 'none';
   }
 });
+fLocationInput.addEventListener('input', () => {
+  locationManuallySet = true;
+});
 function getLocationValue(){
   return fLocationSelect.value === '__custom__' ? fLocationInput.value.trim() : fLocationSelect.value;
 }
@@ -461,6 +464,11 @@ function locateNow(){
       const address = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
       status.textContent = '目前位置：' + address;
       status.classList.add('ok');
+      if (!locationManuallySet) {
+        fLocationSelect.value = '__custom__';
+        fLocationInput.style.display = 'block';
+        fLocationInput.value = address;
+      }
     },
     err => { status.textContent = '定位失敗：' + err.message; },
     { enableHighAccuracy: true, timeout: 10000 }
